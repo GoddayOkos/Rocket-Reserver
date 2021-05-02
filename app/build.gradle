@@ -2,7 +2,7 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("androidx.navigation.safeargs.kotlin")
-    id("com.apollographql.apollo").version("2.5.6")
+    id("com.apollographql.apollo")
 }
 
 android {
@@ -29,6 +29,7 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+
 }
 
 
