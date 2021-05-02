@@ -7,8 +7,11 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.apollographql.apollo.api.Input
 import com.apollographql.apollo.coroutines.await
+import com.apollographql.apollo.exception.ApolloException
 import com.example.rocketreserver.databinding.LaunchListFragmentBinding
+import kotlinx.coroutines.channels.Channel
 
 class LaunchListFragment : Fragment() {
     private lateinit var binding: LaunchListFragmentBinding
@@ -24,23 +27,43 @@ class LaunchListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        lifecycleScope.launchWhenResumed {
-            val response = try {
-                apolloClient.query(LaunchListQuery()).await()
-            } catch (e: Exception) {
-                logIt("Failure ${e.message}")
-                null
-            }
 
-            val launches = response?.data?.launches?.launches?.filterNotNull()
-            if (launches != null && !response.hasErrors()) {
-                val adapter = LaunchListAdapter(launches)
-                binding.launches.also {
-                    it.layoutManager = LinearLayoutManager(requireContext())
-                    it.adapter = adapter
+        val launches = mutableListOf<LaunchListQuery.Launch>()
+        val adapter = LaunchListAdapter(launches)
+        binding.launches.also {
+            it.layoutManager = LinearLayoutManager(requireContext())
+            it.adapter = adapter
+        }
+
+        val channel = Channel<Unit> { Channel.CONFLATED }
+        // offer a first item to do the initial load else the list will stay empty forever
+        channel.offer(Unit)
+        adapter.onEndOfListReached = {
+            channel.offer(Unit)
+        }
+
+        lifecycleScope.launchWhenResumed {
+            var cursor: String? = null
+            for (item in channel) {
+                val response = try {
+                    apolloClient.query(LaunchListQuery(cursor = Input.fromNullable(cursor))).await()
+                } catch (e: ApolloException) {
+                    logIt("Failure $e")
+                    return@launchWhenResumed
                 }
 
+                val newLaunches = response.data?.launches?.launches?.filterNotNull()
+                if (newLaunches != null) {
+                    launches.addAll(newLaunches)
+                    adapter.notifyDataSetChanged()
+                }
+
+                cursor = response.data?.launches?.cursor
+                if (response.data?.launches?.hasMore != true) break
             }
+
+            adapter.onEndOfListReached = null
+            channel.close()
         }
     }
 }

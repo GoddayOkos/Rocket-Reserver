@@ -13,7 +13,7 @@
         android:layout_height="100dp"
         android:id="@+id/missionPatch"
         android:padding="16dp"
-        tools:src="@drawable/ic_placeholder"
+        android:src="@drawable/ic_placeholder"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
